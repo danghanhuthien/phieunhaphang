@@ -1,0 +1,365 @@
+using BLL;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace QuanLyQuanCaPhe
+{
+    public partial class FormCTNH : Form
+    {
+        public static string MaNhapHang;
+        CTNH_BLL ctnhbll = new CTNH_BLL();
+        private DataTable dt;
+        private string manhaphangtam;
+        private string manguyenlieutam;
+        private string manhanvientam;
+        public static decimal TongTien;
+
+        public FormCTNH()
+        {
+            InitializeComponent();
+        }
+
+        private void FormCTNH_Load(object sender, EventArgs e)
+        {
+            LoadComboBoxes();
+            DataTable dtnl = ctnhbll.SP_Select_NgLieu_Koma();
+            dtgnl.DataSource = dtnl;
+
+            DataTable dtctnh = ctnhbll.SP_HienThiCTNH_NH_NV_NCC(manhaphangtam);
+            dtgctnh.DataSource = dtctnh;
+            // Ẩn cột MaNhapHang trong DataGridView
+            if (dtgctnh.Columns["MaNhapHang"] != null)
+            {
+                dtgctnh.Columns["MaNhapHang"].Visible = false;
+            }
+
+        }
+        private void dtgctnh_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+            {
+                // Lấy dữ liệu từ DataTable để đối chiếu
+                DataGridViewRow row = dtgctnh.Rows[e.RowIndex];
+                manhaphangtam = row.Cells["MaNhapHang"].Value.ToString();
+
+                // Hiển thị dữ liệu từ dòng được chọn vào các TextBox và control tương ứng
+                tennncc.Text = row.Cells["Nhà cung cấp"].Value.ToString();
+                nhanvien.Text = row.Cells["Nhân viên"].Value.ToString();
+                tennl.Text = row.Cells["Nguyên liệu"].Value.ToString();
+
+                // Chuyển đổi giá trị ngày tháng và gán cho DateTimePicker
+                if (DateTime.TryParse(row.Cells["Ngày nhập"].Value.ToString(), out DateTime ngayNhap))
+                {
+                    ngaylap.Value = ngayNhap;
+                }
+                else
+                {
+                    MessageBox.Show("Ngày nhập không hợp lệ.");
+                }
+                tangsl.Value = Convert.ToInt32(row.Cells["Số lượng"].Value);
+                dongia.Text = row.Cells["Đơn giá"].Value.ToString();
+                ghichu.Text = row.Cells["Ghi chú"].Value.ToString();
+
+
+            }
+        }
+
+        private void LoadComboBoxes()
+        {
+            // Load MaNhapHang
+            mancc.DataSource = ctnhbll.SP_HienThi_ComboBox_NH_Lay_MaNhapHang();
+            mancc.DisplayMember = "MaNhapHang";
+            mancc.ValueMember = "MaNhapHang";
+
+            // Load TenNhanVien
+            nhanvien.DataSource = ctnhbll.SP_HienThi_ComboBox_NV_Lay_TenNV();
+            nhanvien.DisplayMember = "TenNhanVien";
+            nhanvien.ValueMember = "MaNhanVien"; // Sử dụng mã nhân viên
+
+            // Load TenNhaCungCap
+            tennncc.DataSource = ctnhbll.SP_HienThi_ComboBox_NV_Lay_TenNCC();
+            tennncc.DisplayMember = "TenNhaCungCap";
+            tennncc.ValueMember = "MaNhaCungCap"; // Sử dụng mã nhà cung cấp
+
+
+            // Load TenNhaCungCap
+            tennl.DataSource = ctnhbll.SP_HienThi_TenNL_MaNL_NL();
+            tennl.DisplayMember = "TenNL";
+            tennl.ValueMember = "MaNL"; // Sử dụng mã nhà cung cấp
+
+        }
+
+
+
+        private void taomoi_Click(object sender, EventArgs e)
+        {
+            manhaphangtam = ctnhbll.SinhMa("NhapHang", "MaNhapHang");
+            manguyenlieutam = ctnhbll.SinhMa("NguyenLieu", "MaNL");
+            ghichu.Text = "";
+            dongia.Text = "";
+            nhapnl.Text = "";
+            donvitinh.Text = "";
+            tennncc.SelectedValue = -1;
+            nhanvien.SelectedValue = -1;
+
+            tennl.SelectedValue = -1;
+            // code để rest datetimepicker
+            ngaylap.Value = DateTime.Now;
+
+            slton.Value = slton.Minimum;
+            tangsl.Value = slton.Minimum;
+
+        }
+
+        private void taohd_Click(object sender, EventArgs e)
+        {
+            if (!string.IsNullOrEmpty(manhaphangtam))
+            {
+                DateTime ngayNhap = DateTime.Now; // Lấy ngày hiện tại
+                string ghiChu = ghichu.Text;
+                string maNhaCungCap = tennncc.SelectedValue.ToString(); // Lấy mã nhà cung cấp
+                string maNhanVien = nhanvien.SelectedValue.ToString();  // Lấy mã nhân viên
+
+                ctnhbll.SP_Insert_NhapHang(manhaphangtam, ngayNhap, ghiChu, maNhaCungCap, maNhanVien);
+
+                // Cập nhật tổng tiền sau khi thêm chi tiết nhập hàng
+                ctnhbll.SP_Update_TongTien_NhapHang(manhaphangtam);
+
+                // Cập nhật lại ComboBox và DataGridView sau khi lưu
+                LoadComboBoxes();
+                dtgctnh.DataSource = ctnhbll.SP_HienThiCTNH_NH_NV_NCC(manhaphangtam);
+            }
+            else
+            {
+                MessageBox.Show("Bạn phải tạo mã nhập hàng trước khi lưu.");
+            }
+        }
+
+        private void luuctnh_Click(object sender, EventArgs e)
+        {
+            string maNhapHang = mancc.SelectedValue.ToString(); // Lấy mã nhập hàng từ ComboBox
+            string maNL = tennl.SelectedValue.ToString(); ; // Mã nguyên liệu tạm
+            int soLuong = (int)tangsl.Value;
+            float donGia;
+            string teNl = tennl.Text; // Lấy tên nguyên liệu từ ComboBox
+            // Chuyển đổi giá trị từ TextBox thành float
+            if (float.TryParse(dongia.Text, out donGia))
+            {
+                // Gọi BLL để lưu chi tiết nhập hàng
+                ctnhbll.SP_Insert_ChiTietNhapHang(maNhapHang, maNL, soLuong, donGia, teNl);
+
+                // Cập nhật lại DataGridView sau khi lưu
+                dt = ctnhbll.SP_HienThiCTNH_NH_NV_NCC(maNhapHang);
+                dtgctnh.DataSource = dt;
+                ctnhbll.SP_Update_TongTien_NhapHang(maNhapHang);
+                ctnhbll.SP_CongSoLuongNguyenLieu(maNhapHang, maNL, soLuong);
+
+                FormCTNH_Load( sender,  e);
+
+                MessageBox.Show("Lưu chi tiết nhập hàng thành công.");
+            }
+            else
+            {
+                MessageBox.Show("Vui lòng nhập đúng đơn giá.");
+            }
+        }
+
+        private void suactnh_Click(object sender, EventArgs e)
+        {
+            string maNhapHang = mancc.SelectedValue.ToString();
+            string maNLCu = tennl.SelectedValue.ToString(); // Giả sử bạn muốn thay đổi nguyên liệu hiện tại
+            string maNLMoi = tennl.SelectedValue.ToString(); // Lấy mã nguyên liệu mới từ ComboBox tennl
+            int soLuong = (int)tangsl.Value;
+            float donGia;
+            string teNl = tennl.Text;
+            DateTime ngayNhap = ngaylap.Value;
+            // Chuyển đổi giá trị từ TextBox thành float
+            if (float.TryParse(dongia.Text, out donGia))
+            {
+                ctnhbll.SP_TruSoLuongNguyenLieu(maNhapHang, maNLCu);
+
+                // Gọi BLL để cập nhật chi tiết nhập hàng
+                ctnhbll.SP_Update_ChiTietNhapHang(maNhapHang, maNLCu, teNl, maNLMoi, soLuong, donGia, ngayNhap);
+
+                // Cập nhật lại DataGridView sau khi cập nhật
+                dt = ctnhbll.SP_HienThiCTNH_NH_NV_NCC(maNhapHang);
+                dtgctnh.DataSource = dt;
+                ctnhbll.SP_Update_TongTien_NhapHang(maNhapHang);
+                ctnhbll.SP_CongSoLuongNguyenLieu(maNhapHang, maNLCu, soLuong);
+
+
+
+                FormCTNH_Load(sender, e);
+
+                MessageBox.Show("Cập nhật chi tiết nhập hàng thành công.");
+            }
+            else
+            {
+                MessageBox.Show("Vui lòng nhập đúng đơn giá.");
+            }
+        }
+
+        private void xoactnh_Click(object sender, EventArgs e)
+        {
+            if (!string.IsNullOrEmpty(manhaphangtam))
+            {
+                string maNhapHang = mancc.SelectedValue.ToString();
+                string maNL = tennl.SelectedValue.ToString();
+
+                // Gọi BLL để xóa chi tiết nhập hàng
+                ctnhbll.SP_Delete_ChiTietNhapHang(maNhapHang, maNL);
+
+                // Cập nhật lại DataGridView sau khi xóa
+                dt = ctnhbll.SP_HienThiCTNH_NH_NV_NCC(maNhapHang);
+                dtgctnh.DataSource = dt;
+                ctnhbll.SP_Update_TongTien_NhapHang(maNhapHang); 
+
+                ctnhbll.SP_TruSoLuongNguyenLieu(maNhapHang, maNL);
+                FormCTNH_Load(sender, e);
+
+
+                MessageBox.Show("Xóa chi tiết nhập hàng thành công.");
+            }
+            else
+            {
+                MessageBox.Show("Vui lòng chọn mã nhập hàng và mã nguyên liệu.");
+            }
+        }
+        private void mancc_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (mancc.SelectedIndex != -1)
+            {
+                string LoaiSP = mancc.SelectedValue.ToString();
+                DataTable dt = ctnhbll.SP_HienThiCTNH_NH_NV_NCC(LoaiSP);
+                dtgctnh.DataSource = dt;
+
+                // Lấy DataTable từ phương thức SP_Select_NhapHang()
+                DataTable luutam = ctnhbll.SP_Select_NhapHang();
+
+                // Tìm hàng có mã nhập hàng khớp với LoaiSP
+                DataRow[] result = luutam.Select($"MaNhapHang = '{LoaiSP}'");
+
+                if (result.Length > 0)
+                {
+                    // Lấy giá trị TongTien từ hàng đầu tiên khớp với điều kiện
+                    decimal tongtien = Convert.ToDecimal(result[0]["TongTien"]);
+                    TongTien = tongtien;
+                }
+            }
+        }
+
+        private void themnl_Click(object sender, EventArgs e)
+        {
+            string maNL = manguyenlieutam; // Mã nguyên liệu tạm
+            string tenNL = nhapnl.Text; // Tên nguyên liệu
+            int soLuong = (int)slton.Value; // Số lượng tồn
+            string donViTinh = donvitinh.Text; // Đơn vị tính
+
+            // Kiểm tra xem các giá trị đầu vào có hợp lệ không
+            if (string.IsNullOrEmpty(maNL) || string.IsNullOrEmpty(tenNL) || soLuong <= 0 || string.IsNullOrEmpty(donViTinh))
+            {
+                MessageBox.Show("Vui lòng nhập đầy đủ thông tin và số lượng phải lớn hơn 0.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Gọi BLL để thêm nguyên liệu mới
+            ctnhbll.SP_ThemNguyenLieu(maNL, tenNL, soLuong, donViTinh);
+
+            // Tải lại dữ liệu sau khi thêm
+            FormCTNH_Load(sender, e);
+
+            MessageBox.Show("Thêm nguyên liệu thành công.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+
+        private void suanl_Click(object sender, EventArgs e)
+        {
+            string maNL = manguyenlieutam; // Mã nguyên liệu tạm
+            string tenNL = nhapnl.Text; // Tên nguyên liệu
+            int soLuong = (int)slton.Value; // Số lượng tồn
+            string donViTinh = donvitinh.Text; // Đơn vị tính
+            ctnhbll.SP_SuaNguyenLieu(maNL, tenNL, soLuong, donViTinh);
+            FormCTNH_Load(sender, e);
+
+        }
+
+        private void xoanl_Click(object sender, EventArgs e)
+        {
+            string maNL = manguyenlieutam; // Mã nguyên liệu tạm
+
+            ctnhbll.SP_XoaNguyenLieu(maNL);
+            FormCTNH_Load(sender, e);
+
+
+        }
+
+        private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            // Kiểm tra nếu dòng được chọn hợp lệ
+            if (e.RowIndex >= 0 && e.RowIndex < dtgnl.Rows.Count)
+            {
+                DataTable dt = ctnhbll.SP_Select_NgLieu();
+
+                // Kiểm tra nếu dòng tồn tại trong DataTable
+                if (e.RowIndex < dt.Rows.Count)
+                {
+                    DataRow row = dt.Rows[e.RowIndex];
+
+                    // Hiển thị dữ liệu từ dòng được chọn vào các TextBox tương ứng
+                    manguyenlieutam = row["MaNL"].ToString();
+                    nhapnl.Text = row["TenNL"].ToString();
+                    donvitinh.Text = row["DonViTinh"].ToString();
+                    slton.Text = row["SoLuongTon"].ToString();
+                }
+            }
+        }
+        private void xoa_Click(object sender, EventArgs e)
+        {
+            if (!string.IsNullOrEmpty(mancc.SelectedValue.ToString()))
+            {
+                string maNhapHang = mancc.SelectedValue.ToString(); // Lấy mã nhập hàng từ ComboBox
+
+                // Gọi BLL để xóa phiếu nhập hàng
+                ctnhbll.SP_XoaPhieuNhaP(maNhapHang);
+
+                // Cập nhật lại ComboBox và DataGridView sau khi xóa
+                LoadComboBoxes();
+                dtgctnh.DataSource = ctnhbll.SP_HienThiCTNH_NH_NV_NCC(maNhapHang);
+
+                MessageBox.Show("Xóa phiếu nhập hàng thành công.");
+            }
+            else
+            {
+                MessageBox.Show("Vui lòng chọn mã nhập hàng.");
+            }
+        }
+
+        private void timkiem_Click(object sender, EventArgs e)
+        {
+            string tuKhoa = manhaphangtam;
+            DateTime? ngayNhapFrom = ToDay.Value;
+            DateTime? ngayNhapTo = Denday.Value;
+            dtgctnh.DataSource = ctnhbll.TimKiemTuKhoaVaNgay(tuKhoa, ngayNhapFrom, ngayNhapTo);
+
+        }
+
+        private void groupBox2_Enter(object sender, EventArgs e)
+        {
+
+        }
+
+        private void Inpnh_Click(object sender, EventArgs e)
+        {
+            MaNhapHang = mancc.Text;
+            xuatphieunhaphang xuatHD = new xuatphieunhaphang();
+            xuatHD.Show();
+        }
+    }
+}
